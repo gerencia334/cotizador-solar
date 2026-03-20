@@ -20,13 +20,13 @@ if metodo == "📸 Subir Foto de Recibo":
     if archivo:
         # Valores simulados basados en tu recibo real de 2,638 kWh
         st.success("✅ Datos extraídos del recibo")
-        consumo_kwh = 2638.0
-        tarifa_kwh = 773.52
+        consumo_kwh = 0.0
+        tarifa_kwh = 0.0
         st.info(f"Consumo: {consumo_kwh} kWh | Tarifa: ${tarifa_kwh}")
 else:
     c1, c2 = st.columns(2)
-    consumo_kwh = c1.number_input("Consumo (kWh/mes)", value=2638.0)
-    tarifa_kwh = c2.number_input("Tarifa ($/kWh)", value=773.52)
+    consumo_kwh = c1.number_input("Consumo (kWh/mes)", value=0.0)
+    tarifa_kwh = c2.number_input("Tarifa ($/kWh)", value=0.0)
 
 # --- MÓDULO 2: COSTOS TÉCNICOS (APU DINÁMICO) ---
 st.header("2. Ingeniería y Costos Base")
