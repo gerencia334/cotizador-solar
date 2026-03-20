@@ -5,7 +5,7 @@ st.set_page_config(page_title="Range of Solutions - Cotizador", layout="centered
 col1, col2, col3 = st.columns([1, 2, 1]) # Crea 3 columnas, la del centro es más ancha
 
 with col2:
-    st.image("tu_logo.png", width=200) # Ajusta el ancho (width) a tu gusto
+    st.image("LOGO PNG2.png", width=200) # Ajusta el ancho (width) a tu gusto
 
 # Configuración de la interfaz para móvil
 
