@@ -10,7 +10,7 @@ with col2:
 # Configuración de la interfaz para móvil
 
 # Estilo visual
-st.markdown("<h1 style='text-align: center; color: #f39c12;'>☀️ SolarQuote Pro</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #f39c12;'>☀️ COTIZADOR SOLAR FV</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center;'><b>Range of Solutions S.A.S.</b></p>", unsafe_allow_html=True)
 
 # --- MÓDULO 1: CAPTURA DE CONSUMO (EL RECIBO) ---
