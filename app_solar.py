@@ -31,18 +31,18 @@ st.markdown("<p style='text-align: center; color: #7f8c8d; font-size: 14px;'>Ing
 st.header("1. Entrada de Datos de Consumo")
 metodo = st.selectbox("Método de captura de datos:", ["📸 Analizar Recibo (PDF o Imagen) con IA", "⌨️ Registro Manual"])
 
-# Variables globales con valores de respaldo
-consumo_kwh = 2638.0
-tarifa_kwh = 1100.0
+# Variables globales inicializadas por defecto con tus datos reales de respaldo
+consumo_kwh = 246.69
+tarifa_kwh = 920.32
 
 if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
     archivo = st.file_uploader("Sube el recibo original (Air-e / Afinia)", type=['pdf', 'jpg', 'png', 'jpeg'])
     
     if archivo:
         if client_gemini is None:
-            st.warning("⚠️ Modo demostración activo (GEMINI_API_KEY no detectada). Cargando datos de prueba.")
-            consumo_kwh = 2638.0
-            tarifa_kwh = 1100.0
+            st.warning("⚠️ Modo demostración activo (GEMINI_API_KEY no detectada). Cargando datos reales de tu recibo.")
+            consumo_kwh = 246.69
+            tarifa_kwh = 920.32
         else:
             with st.spinner("🤖 Google Gemini analizando la estructura del documento... Por favor espera."):
                 try:
@@ -59,7 +59,7 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                     )
                     
                     response = client_gemini.models.generate_content(
-                        model='gemini-1.5-flash',
+                        model='gemini-2.5-flash',
                         contents=[
                             types.Part.from_bytes(
                                 data=file_bytes,
@@ -73,18 +73,18 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                     )
                     
                     datos = json.loads(response.text)
-                    consumo_kwh = float(datos.get("consumo", 2638.0))
-                    tarifa_kwh = float(datos.get("tarifa", 1100.0))
-                    st.success(f"✅ Documento analizado con éxito por Gemini: {consumo_kwh:,.0f} kWh/mes a ${tarifa_kwh:,.1f}/kWh")
+                    consumo_kwh = float(datos.get("consumo", 246.69))
+                    tarifa_kwh = float(datos.get("tarifa", 920.32))
+                    st.success(f"✅ Documento analizado con éxito por Gemini: {consumo_kwh:,.2f} kWh/mes a ${tarifa_kwh:,.2f}/kWh")
                     
                 except Exception as e:
                     st.error(f"Error en la lectura del documento: {e}. Se cargaron los datos de respaldo.")
-                    consumo_kwh = 2638.0
-                    tarifa_kwh = 1100.0
+                    consumo_kwh = 246.69
+                    tarifa_kwh = 920.32
 else:
     c1, c2 = st.columns(2)
-    consumo_kwh = c1.number_input("Consumo Mensual (kWh/mes)", min_value=0.0, step=10.0, value=2638.0)
-    tarifa_kwh = c2.number_input("Tarifa del Servicio ($/kWh)", min_value=0.0, step=1.0, value=1100.0)
+    consumo_kwh = c1.number_input("Consumo Mensual (kWh/mes)", min_value=0.0, step=10.0, value=246.69)
+    tarifa_kwh = c2.number_input("Tarifa del Servicio ($/kWh)", min_value=0.0, step=1.0, value=920.32)
 
 # --- MÓDULO 2: APU Y COSTOS DE INGENIERÍA ---
 st.header("2. Ingeniería Económica y Costos Base")
@@ -152,7 +152,7 @@ tab1, tab2 = st.tabs(["💡 Para Todo Público (Didáctico)", "📊 Para Experto
 with tab1:
     st.success(f"⏱️ **¡Tu sistema se paga solo en {payback_exacto:.1f} años!** Posterior a esto, disfrutas de energía solar completamente gratuita.")
     col_v1, col_v2 = st.columns(2)
-    # SOLUCIONADO (LÍNEA 155): Indicamos la posición [0] para formatear el Año 1 de forma correcta
+    # CORREGIDO: Seleccionamos el índice [0] para renderizar únicamente el Año 1 sin romper la app
     col_v1.metric("Tu Ahorro Estimado Año 1", f"$ {ahorros_anuales[0]:,.0f}")
     col_v2.metric("Alivio Tributario (Ley 1715)", f"$ {beneficio_fiscal_ley1715:,.0f}")
     
@@ -208,5 +208,4 @@ def generar_propuesta_pdf():
     
     pdf.set_font('Helvetica', 'B', 12)
     pdf.set_text_color(243, 156, 18)
-    pdf.cell(0, 8, "1. RESUMEN DE COMPRA Y BENEFICIOS FINANCIEROS", ln=True)
-    
+
