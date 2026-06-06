@@ -57,7 +57,7 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                         prompt_ia = (
                             "Analiza el siguiente texto extraído de un recibo de energía de Colombia. "
                             "Identifica y extrae exactamente los siguientes dos valores numéricos: "
-                            "1. El consumo de energía activa promedio de los 7 meses en kWh. "
+                            "1. El consumo de energía activa suma los 7 meses y sacar el promedio en kWh. "
                             "2. El valor o costo cobrado por cada kWh ($/kWh). "
                             "Devuelve estrictamente un objeto JSON válido con las llaves exactas: 'consumo' y 'tarifa'. "
                             "No agregues texto explicativo, notas ni bloques de código markdown.\n\n"
