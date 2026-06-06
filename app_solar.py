@@ -31,7 +31,7 @@ st.markdown("<p style='text-align: center; color: #7f8c8d; font-size: 14px;'>Ing
 st.header("1. Entrada de Datos de Consumo")
 metodo = st.selectbox("Método de captura de datos:", ["📸 Analizar Recibo (PDF o Imagen) con IA", "⌨️ Registro Manual"])
 
-# Variables globales inicializadas por defecto con tus datos reales de respaldo
+# Variables globales con valores de respaldo reales de tu recibo (246.69 kWh y $920.32)
 consumo_kwh = 246.69
 tarifa_kwh = 920.32
 
@@ -40,7 +40,7 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
     
     if archivo:
         if client_gemini is None:
-            st.warning("⚠️ Modo demostración activo (GEMINI_API_KEY no detectada). Cargando datos reales de tu recibo.")
+            st.warning("⚠️ Modo demostración activo (GEMINI_API_KEY no detectada). Cargando datos de prueba.")
             consumo_kwh = 246.69
             tarifa_kwh = 920.32
         else:
@@ -50,16 +50,17 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                     mime_type = "application/pdf" if archivo.name.lower().endswith('.pdf') else "image/jpeg"
                     
                     prompt_ia = (
-                        "Analiza este recibo de energía eléctrica de Colombia (Air-e o Afinia). "
+                        "Analiza este recibo de energía eléctrica de Colombia. "
                         "Busca minuciosamente en el documento y extrae: "
-                        "1. El consumo de energía activa del último mes en kWh. "
-                        "2. El valor o tarifa cobrada por cada kWh ($/kWh). "
+                        "1. El consumo de energía activa del último mes en kWh (ejemplo: 246.69). "
+                        "2. El valor o tarifa cobrada por cada kWh en pesos ($/kWh, ejemplo: 920.32). "
                         "Devuelve únicamente un objeto JSON válido con las llaves exactas: 'consumo' y 'tarifa'. "
-                        "No agregues texto explicativo, saludos ni bloques de código markdown."
+                        "No agregues texto explicativo, notas ni bloques de código markdown."
                     )
                     
+                    # ENFOQUE COMPATIBLE: Forzamos el uso del modelo 'gemini-1.5-flash' para saltar el bloqueo 403
                     response = client_gemini.models.generate_content(
-                        model='gemini-2.5-flash',
+                        model='gemini-1.5-flash',
                         contents=[
                             types.Part.from_bytes(
                                 data=file_bytes,
@@ -78,7 +79,7 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                     st.success(f"✅ Documento analizado con éxito por Gemini: {consumo_kwh:,.2f} kWh/mes a ${tarifa_kwh:,.2f}/kWh")
                     
                 except Exception as e:
-                    st.error(f"Error en la lectura del documento: {e}. Se cargaron los datos de respaldo.")
+                    st.error(f"Error en la lectura del documento: {e}. Se cargaron los datos de respaldo automáticos.")
                     consumo_kwh = 246.69
                     tarifa_kwh = 920.32
 else:
@@ -152,7 +153,6 @@ tab1, tab2 = st.tabs(["💡 Para Todo Público (Didáctico)", "📊 Para Experto
 with tab1:
     st.success(f"⏱️ **¡Tu sistema se paga solo en {payback_exacto:.1f} años!** Posterior a esto, disfrutas de energía solar completamente gratuita.")
     col_v1, col_v2 = st.columns(2)
-    # CORREGIDO: Seleccionamos el índice [0] para renderizar únicamente el Año 1 sin romper la app
     col_v1.metric("Tu Ahorro Estimado Año 1", f"$ {ahorros_anuales[0]:,.0f}")
     col_v2.metric("Alivio Tributario (Ley 1715)", f"$ {beneficio_fiscal_ley1715:,.0f}")
     
@@ -207,5 +207,3 @@ def generar_propuesta_pdf():
     pdf.ln(5)
     
     pdf.set_font('Helvetica', 'B', 12)
-    pdf.set_text_color(243, 156, 18)
-
