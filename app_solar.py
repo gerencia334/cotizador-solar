@@ -16,8 +16,8 @@ try:
 except Exception:
     client_gemini = None
 
-# Encabezado e Imagen Corporativa adaptada a móviles
-col1, col2, col3 = st.columns()
+# CORRECCIÓN DE COLUMNAS (LÍNEA 20): Agregamos la proporción [1, 2, 1] para evitar el TypeError
+col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     try:
         st.image("LOGO PNG2.png", use_container_width=True)
@@ -36,7 +36,6 @@ consumo_kwh = 2638.0
 tarifa_kwh = 1100.0
 
 if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
-    # El cargador ahora acepta PDF e imágenes de forma nativa sin generar bloqueos
     archivo = st.file_uploader("Sube el recibo original (Air-e / Afinia)", type=['pdf', 'jpg', 'png', 'jpeg'])
     
     if archivo:
@@ -45,9 +44,8 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
             consumo_kwh = 2638.0
             tarifa_kwh = 1100.0
         else:
-            with st.spinner("🤖 Google Gemini analizando la estructura del PDF... Por favor espera."):
+            with st.spinner("🤖 Google Gemini analizando la estructura del documento... Por favor espera."):
                 try:
-                    # Leer los bytes del archivo cargado en Streamlit
                     file_bytes = archivo.read()
                     mime_type = "application/pdf" if archivo.name.lower().endswith('.pdf') else "image/jpeg"
                     
@@ -60,7 +58,6 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                         "No agregues texto explicativo, saludos ni bloques de código markdown."
                     )
                     
-                    # Llamada directa a Gemini pasando los bytes y el tipo MIME correcto (PDF o Imagen)
                     response = client_gemini.models.generate_content(
                         model='gemini-2.5-flash',
                         contents=[
@@ -70,20 +67,18 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                             ),
                             prompt_ia
                         ],
-                        # Forzamos a Gemini a que responda estrictamente en un formato JSON estructurado
                         config=types.GenerateContentConfig(
                             response_mime_type="application/json",
                         ),
                     )
                     
-                    # Procesamiento de la respuesta estructurada
                     datos = json.loads(response.text)
                     consumo_kwh = float(datos.get("consumo", 2638.0))
                     tarifa_kwh = float(datos.get("tarifa", 1100.0))
-                    st.success(f"✅ PDF analizado con éxito por Gemini: {consumo_kwh:,.0f} kWh/mes a ${tarifa_kwh:,.1f}/kWh")
+                    st.success(f"✅ Documento analizado con éxito por Gemini: {consumo_kwh:,.0f} kWh/mes a ${tarifa_kwh:,.1f}/kWh")
                     
                 except Exception as e:
-                    st.error(f"Error en la lectura del PDF: {e}. Se cargaron los datos de respaldo.")
+                    st.error(f"Error en la lectura del documento: {e}. Se cargaron los datos de respaldo.")
                     consumo_kwh = 2638.0
                     tarifa_kwh = 1100.0
 else:
@@ -177,7 +172,7 @@ with tab2:
     st.dataframe(df_financiero.style.format({"Ahorro del Periodo ($)": "$ {:,.0f}", "Flujo Acumulado ($)": "$ {:,.0f}"}), use_container_width=True)
     st.line_chart(df_financiero.set_index("Año")["Flujo Acumulado ($)"])
 
-# --- MÓDULO 5: MOTOR DE EXPORTACIÓN Y CIERRE COMERCIAL ---
+# --- MÓDULO 5: MOTOR DE EXPORTACIÓN E INFORME FINAL ---
 st.header("5. Entregables y Cierre de Venta")
 
 class CotizadorSolarPDF(FPDF):
@@ -203,3 +198,15 @@ def generar_propuesta_pdf():
     pdf.set_y(25)
     pdf.set_font('Helvetica', 'B', 16)
     pdf.set_text_color(44, 62, 80)
+    pdf.cell(0, 10, "ESTUDIO DE FACTIBILIDAD Y OFERTA SOLAR FV", ln=True)
+    
+    pdf.set_draw_color(243, 156, 18)
+    pdf.set_line_width(0.8)
+    pdf.line(15, 35, 195, 35)
+    pdf.ln(5)
+    
+    pdf.set_font('Helvetica', 'B', 12)
+    pdf.set_text_color(243, 156, 18)
+    pdf.cell(0, 8, "1. RESUMEN DE COMPRA Y BENEFICIOS FINANCIEROS", ln=True)
+    
+    pdf.set_font('Helvetica', '', 10)
