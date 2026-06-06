@@ -6,7 +6,6 @@ import urllib.parse
 from google import genai
 from google.genai import types
 from fpdf import FPDF
-from pypdf import PdfReader
 
 # --- CONFIGURACIÓN E INICIALIZACIÓN ---
 st.set_page_config(page_title="Range of Solutions - Cotizador Pro Gemini", layout="centered", initial_sidebar_state="collapsed")
@@ -32,7 +31,7 @@ st.markdown("<p style='text-align: center; color: #7f8c8d; font-size: 14px;'>Ing
 st.header("1. Entrada de Datos de Consumo")
 metodo = st.selectbox("Método de captura de datos:", ["📸 Analizar Recibo (PDF o Imagen) con IA", "⌨️ Registro Manual"])
 
-# Variables globales con valores de respaldo reales extraídos de tu recibo de Air-e
+# Variables globales con valores de respaldo reales extraídos de tu recibo de Air-e (246.69 kWh y $920.32)
 consumo_kwh = 246.69
 tarifa_kwh = 920.32
 
@@ -45,52 +44,38 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
             consumo_kwh = 246.69
             tarifa_kwh = 920.32
         else:
-            with st.spinner("🤖 Analizando la estructura del documento de forma segura... Por favor espera."):
+            with st.spinner("🤖 Google Gemini analizando la estructura del documento... Por favor espera."):
                 try:
-                    if archivo.name.lower().endswith('.pdf'):
-                        reader = PdfReader(archivo)
-                        texto_recibo = ""
-                        for page in reader.pages:
-                            texto_recibo += page.extract_text() + "\n"
-                        
-                        prompt_ia = (
-                            "Analiza el siguiente texto extraído de un recibo de energía de la empresa Air-e o Afinia in Colombia. "
-                            "Identifica y extrae exactamente los siguientes dos valores numéricos: "
-                            "1. El consumo de energía activa del último mes en kWh. "
-                            "2. El valor o costo cobrada por cada kWh ($/kWh). "
-                            "Devuelve estrictamente un objeto JSON válido con las llaves exactas: 'consumo' y 'tarifa'. "
-                            "No agregues texto explicativo, notas ni bloques de código markdown.\n\n"
-                            f"Texto del recibo:\n{texto_recibo}"
-                        )
-                        
-                        response = client_gemini.models.generate_content(
-                            model='gemini-2.5-flash',
-                            contents=prompt_ia,
-                            config=types.GenerateContentConfig(
-                                response_mime_type="application/json",
+                    file_bytes = archivo.read()
+                    mime_type = "application/pdf" if archivo.name.lower().endswith('.pdf') else "image/jpeg"
+                    
+                    prompt_ia = (
+                        "Analiza este recibo de energía eléctrica de Colombia. "
+                        "Busca minuciosamente en el documento y extrae: "
+                        "1. El consumo de energía activa del último mes en kWh (ejemplo: 246.69). "
+                        "2. El valor o tarifa cobrada por cada kWh en pesos ($/kWh, ejemplo: 920.32). "
+                        "Devuelve únicamente un objeto JSON válido con las llaves exactas: 'consumo' y 'tarifa'. "
+                        "No agregues texto explicativo, notas ni bloques de código markdown."
+                    )
+                    
+                    response = client_gemini.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=[
+                            types.Part.from_bytes(
+                                data=file_bytes,
+                                mime_type=mime_type,
                             ),
-                        )
-                    else:
-                        file_bytes = archivo.read()
-                        prompt_ia = (
-                            "Analiza la imagen de este recibo de energía de Colombia. Extrae el consumo del último mes en kWh "
-                            "y la tarifa por kWh en pesos. Devuelve un JSON con las llaves exactas: 'consumo' y 'tarifa'."
-                        )
-                        response = client_gemini.models.generate_content(
-                            model='gemini-2.5-flash',
-                            contents=[
-                                types.Part.from_bytes(data=file_bytes, mime_type="image/jpeg"),
-                                prompt_ia
-                            ],
-                            config=types.GenerateContentConfig(
-                                response_mime_type="application/json",
-                            ),
-                        )
+                            prompt_ia
+                        ],
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                        ),
+                    )
                     
                     datos = json.loads(response.text)
                     consumo_kwh = float(datos.get("consumo", 246.69))
                     tarifa_kwh = float(datos.get("tarifa", 920.32))
-                    st.success(f"✅ Documento analizado con éxito por la IA: {consumo_kwh:,.2f} kWh/mes a ${tarifa_kwh:,.2f}/kWh")
+                    st.success(f"✅ Documento analizado con éxito por Gemini: {consumo_kwh:,.2f} kWh/mes a ${tarifa_kwh:,.2f}/kWh")
                     
                 except Exception as e:
                     st.error(f"Error en la lectura del documento: {e}. Se cargaron los datos de respaldo automáticos.")
@@ -154,7 +139,7 @@ payback_exacto = 0.0
 for idx, saldo in enumerate(flujo_caja_acumulado):
     if saldo >= 0:
         if idx == 0:
-            payback_exacto = (precio_final_cliente - beneficio_fiscal_ley1715) / ahorros_anuales
+            payback_exacto = (precio_final_cliente - beneficio_fiscal_ley1715) / ahorros_anuales[0]
         else:
             prev_saldo = flujo_caja_acumulado[idx-1]
             payback_exacto = idx + (abs(prev_saldo) / ahorros_anuales[idx])
@@ -167,7 +152,7 @@ tab1, tab2 = st.tabs(["💡 Para Todo Público (Didáctico)", "📊 Para Experto
 with tab1:
     st.success(f"⏱️ **¡Tu sistema se paga solo en {payback_exacto:.1f} años!** Posterior a esto, disfrutas de energía solar completamente gratuita.")
     col_v1, col_v2 = st.columns(2)
-    col_v1.metric("Tu Ahorro Estimado Año 1", f"$ {ahorros_anuales:,.0f}")
+    col_v1.metric("Tu Ahorro Estimado Año 1", f"$ {ahorros_anuales[0]:,.0f}")
     col_v2.metric("Alivio Tributario (Ley 1715)", f"$ {beneficio_fiscal_ley1715:,.0f}")
     
     st.markdown(f"""
@@ -180,13 +165,47 @@ with tab1:
 with tab2:
     st.caption("Evolución Detallada del Flujo de Caja Descontado y Pérdida de Eficiencia Mínima")
     
-    # MODIFICACIÓN DE FUERZA BRUTA: Cambiamos la variable a listas independientes
-    # para que la caché de Streamlit Cloud se limpie obligatoriamente y no busque más la línea vieja
-    columnas_tabla = ["Año", "Ahorro del Periodo ($)", "Flujo Acumulado ($)"]
-    valores_tabla = [list(años), list(ahorros_anuales), list(flujo_caja_acumulado)]
+    # ESTRUCTURA CORREGIDA: Se mapean los datos estructurados año a año sin generar SyntaxErrors en la caché
+    tabla_final_pro = pd.DataFrame({
+        "Año": años,
+        "Ahorro del Periodo ($)": ahorros_anuales,
+        "Flujo Acumulado ($)": flujo_caja_acumulado
+    })
     
-    tabla_final_pro = pd.DataFrame(columns=columnas_tabla)
-    tabla_final_pro["Año"] = valores_tabla[0]
-    tabla_final_pro["Ahorro del Periodo ($)"] = valores_tabla[1]
-    tabla_final_pro["Flujo Acumulado ($)"] = valores_tabla[2]
+    st.dataframe(tabla_final_pro.style.format({"Ahorro del Periodo ($)": "$ {:,.0f}", "Flujo Acumulado ($)": "$ {:,.0f}"}), use_container_width=True)
+    st.line_chart(tabla_final_pro.set_index("Año")["Flujo Acumulado ($)"])
+
+# --- MÓDULO 5: MOTOR DE EXPORTACIÓN E INFORME FINAL ---
+st.header("5. Entregables y Cierre de Venta")
+
+class CotizadorSolarPDF(FPDF):
+    def header(self):
+        self.set_fill_color(243, 156, 18) 
+        self.rect(0, 0, 210, 15, 'F')
+        self.set_font('Helvetica', 'B', 10)
+        self.set_text_color(255, 255, 255)
+        self.cell(0, -2, "RANGE OF SOLUTIONS S.A.S. - INFORME ENERGÉTICO", align='C')
+        self.ln(12)
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font('Helvetica', 'I', 8)
+        self.set_text_color(127, 138, 143)
+        self.cell(0, 10, f"Página {self.page_no()} | Propuesta generada automáticamente por Range Solutions", align='C')
+
+def generar_propuesta_pdf():
+    pdf = CotizadorSolarPDF()
+    pdf.add_page()
+    pdf.set_margins(15, 20, 15)
     
+    pdf.set_y(25)
+    pdf.set_font('Helvetica', 'B', 16)
+    pdf.set_text_color(44, 62, 80)
+    pdf.cell(0, 10, "ESTUDIO DE FACTIBILIDAD Y OFERTA SOLAR FV", ln=True)
+    
+    pdf.set_draw_color(243, 156, 18)
+    pdf.set_line_width(0.8)
+    pdf.line(15, 35, 195, 35)
+    pdf.ln(5)
+    
+    pdf.set_font('Helvetica', 'B', 12)
