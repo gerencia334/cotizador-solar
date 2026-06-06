@@ -16,8 +16,8 @@ try:
 except Exception:
     client_gemini = None
 
-# Configuración de las columnas principales
-col1, col2, col3 = st.columns()
+# CORRECCIÓN DE LA LÍNEA 20: Definimos explícitamente el número 3 para crear las columnas del encabezado
+col1, col2, col3 = st.columns(3)
 with col2:
     try:
         st.image("LOGO PNG2.png", use_container_width=True)
@@ -139,7 +139,7 @@ payback_exacto = 0.0
 for idx, saldo in enumerate(flujo_caja_acumulado):
     if saldo >= 0:
         if idx == 0:
-            payback_exacto = (precio_final_cliente - beneficio_fiscal_ley1715) / ahorros_anuales[0]
+            payback_exacto = (precio_final_cliente - beneficio_fiscal_ley1715) / ahorros_anuales
         else:
             prev_saldo = flujo_caja_acumulado[idx-1]
             payback_exacto = idx + (abs(prev_saldo) / ahorros_anuales[idx])
@@ -152,7 +152,7 @@ tab1, tab2 = st.tabs(["💡 Para Todo Público (Didáctico)", "📊 Para Experto
 with tab1:
     st.success(f"⏱️ **¡Tu sistema se paga solo en {payback_exacto:.1f} años!** Posterior a esto, disfrutas de energía solar completamente gratuita.")
     col_v1, col_v2 = st.columns(2)
-    col_v1.metric("Tu Ahorro Estimado Año 1", f"$ {ahorros_anuales[0]:,.0f}")
+    col_v1.metric("Tu Ahorro Estimado Año 1", f"$ {ahorros_anuales:,.0f}")
     col_v2.metric("Alivio Tributario (Ley 1715)", f"$ {beneficio_fiscal_ley1715:,.0f}")
     
     st.markdown(f"""
@@ -165,7 +165,6 @@ with tab1:
 with tab2:
     st.caption("Evolución Detallada del Flujo de Caja Descontado y Pérdida de Eficiencia Mínima")
     
-    # ESTRUCTURA CORREGIDA: Se mapean los datos estructurados año a año sin generar SyntaxErrors en la caché
     tabla_final_pro = pd.DataFrame({
         "Año": años,
         "Ahorro del Periodo ($)": ahorros_anuales,
@@ -209,3 +208,4 @@ def generar_propuesta_pdf():
     pdf.ln(5)
     
     pdf.set_font('Helvetica', 'B', 12)
+    pdf.set_text_color(243, 156, 18)
