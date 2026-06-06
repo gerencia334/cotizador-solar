@@ -16,7 +16,7 @@ try:
 except Exception:
     client_gemini = None
 
-# CORRECCIÓN DE COLUMNAS (LÍNEA 20): Agregamos la proporción [1, 2, 1] para evitar el TypeError
+# Configuración de las columnas principales
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     try:
@@ -59,7 +59,7 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                     )
                     
                     response = client_gemini.models.generate_content(
-                        model='gemini-2.5-flash',
+                        model='gemini-1.5-flash',
                         contents=[
                             types.Part.from_bytes(
                                 data=file_bytes,
@@ -139,7 +139,7 @@ payback_exacto = 0.0
 for idx, saldo in enumerate(flujo_caja_acumulado):
     if saldo >= 0:
         if idx == 0:
-            payback_exacto = (precio_final_cliente - beneficio_fiscal_ley1715) / ahorros_anuales
+            payback_exacto = (precio_final_cliente - beneficio_fiscal_ley1715) / ahorros_anuales[0]
         else:
             prev_saldo = flujo_caja_acumulado[idx-1]
             payback_exacto = idx + (abs(prev_saldo) / ahorros_anuales[idx])
@@ -152,7 +152,8 @@ tab1, tab2 = st.tabs(["💡 Para Todo Público (Didáctico)", "📊 Para Experto
 with tab1:
     st.success(f"⏱️ **¡Tu sistema se paga solo en {payback_exacto:.1f} años!** Posterior a esto, disfrutas de energía solar completamente gratuita.")
     col_v1, col_v2 = st.columns(2)
-    col_v1.metric("Tu Ahorro Estimado Año 1", f"$ {ahorros_anuales:,.0f}")
+    # SOLUCIONADO (LÍNEA 155): Indicamos la posición [0] para formatear el Año 1 de forma correcta
+    col_v1.metric("Tu Ahorro Estimado Año 1", f"$ {ahorros_anuales[0]:,.0f}")
     col_v2.metric("Alivio Tributario (Ley 1715)", f"$ {beneficio_fiscal_ley1715:,.0f}")
     
     st.markdown(f"""
@@ -209,4 +210,3 @@ def generar_propuesta_pdf():
     pdf.set_text_color(243, 156, 18)
     pdf.cell(0, 8, "1. RESUMEN DE COMPRA Y BENEFICIOS FINANCIEROS", ln=True)
     
-    pdf.set_font('Helvetica', '', 10)
