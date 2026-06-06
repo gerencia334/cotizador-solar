@@ -6,6 +6,7 @@ import urllib.parse
 from google import genai
 from google.genai import types
 from fpdf import FPDF
+from pypdf import PdfReader  # Procesador nativo de texto para saltar el error 403
 
 # --- CONFIGURACIÓN E INICIALIZACIÓN ---
 st.set_page_config(page_title="Range of Solutions - Cotizador Pro Gemini", layout="centered", initial_sidebar_state="collapsed")
@@ -17,7 +18,7 @@ except Exception:
     client_gemini = None
 
 # Configuración de las columnas principales
-col1, col2, col3 = st.columns([1, 2, 1])
+col1, col2, col3 = st.columns()
 with col2:
     try:
         st.image("LOGO PNG2.png", use_container_width=True)
@@ -31,7 +32,7 @@ st.markdown("<p style='text-align: center; color: #7f8c8d; font-size: 14px;'>Ing
 st.header("1. Entrada de Datos de Consumo")
 metodo = st.selectbox("Método de captura de datos:", ["📸 Analizar Recibo (PDF o Imagen) con IA", "⌨️ Registro Manual"])
 
-# Variables globales con valores de respaldo reales de tu recibo (246.69 kWh y $920.32)
+# Variables globales con valores de respaldo reales extraídos de tu recibo de Air-e
 consumo_kwh = 246.69
 tarifa_kwh = 920.32
 
@@ -44,39 +45,57 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
             consumo_kwh = 246.69
             tarifa_kwh = 920.32
         else:
-            with st.spinner("🤖 Google Gemini analizando la estructura del documento... Por favor espera."):
+            with st.spinner("🤖 Analizando la estructura del documento de forma segura... Por favor espera."):
                 try:
-                    file_bytes = archivo.read()
-                    mime_type = "application/pdf" if archivo.name.lower().endswith('.pdf') else "image/jpeg"
-                    
-                    prompt_ia = (
-                        "Analiza este recibo de energía eléctrica de Colombia. "
-                        "Busca minuciosamente en el documento y extrae: "
-                        "1. El consumo de energía activa del último mes en kWh (ejemplo: 246.69). "
-                        "2. El valor o tarifa cobrada por cada kWh en pesos ($/kWh, ejemplo: 920.32). "
-                        "Devuelve únicamente un objeto JSON válido con las llaves exactas: 'consumo' y 'tarifa'. "
-                        "No agregues texto explicativo, notas ni bloques de código markdown."
-                    )
-                    
-                    # SOLUCIONADO: Usamos 'gemini-2.5-flash', el nombre de modelo correcto y nativo para la librería google-genai
-                    response = client_gemini.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=[
-                            types.Part.from_bytes(
-                                data=file_bytes,
-                                mime_type=mime_type,
+                    # ESTRATEGIA DE SEGURIDAD CONTRA EL ERROR 403:
+                    # Si es un PDF, extraemos el texto en el servidor para no enviarle el binario pesado a Google
+                    if archivo.name.lower().endswith('.pdf'):
+                        reader = PdfReader(archivo)
+                        texto_recibo = ""
+                        for page in reader.pages:
+                            texto_recibo += page.extract_text() + "\n"
+                        
+                        prompt_ia = (
+                            "Analiza el siguiente texto extraído de un recibo de energía de la empresa Air-e o Afinia en Colombia. "
+                            "Identifica y extrae exactamente los siguientes dos valores numéricos: "
+                            "1. El consumo de energía activa del último mes en kWh. "
+                            "2. El valor o costo cobrado por cada kWh ($/kWh). "
+                            "Devuelve estrictamente un objeto JSON válido con las llaves exactas: 'consumo' y 'tarifa'. "
+                            "No agregues texto explicativo, notas ni bloques de código markdown.\n\n"
+                            f"Texto del recibo:\n{texto_recibo}"
+                        )
+                        
+                        # Al enviarle solo texto plano, Gemini procesa en el plan libre sin error de permisos
+                        response = client_gemini.models.generate_content(
+                            model='gemini-2.5-flash',
+                            contents=prompt_ia,
+                            config=types.GenerateContentConfig(
+                                response_mime_type="application/json",
                             ),
-                            prompt_ia
-                        ],
-                        config=types.GenerateContentConfig(
-                            response_mime_type="application/json",
-                        ),
-                    )
+                        )
+                    else:
+                        # Si es una imagen (JPG/PNG), procesamos con el método multimedia tradicional
+                        file_bytes = archivo.read()
+                        prompt_ia = (
+                            "Analiza la imagen de este recibo de energía de Colombia. Extrae el consumo del último mes en kWh "
+                            "y la tarifa por kWh en pesos. Devuelve un JSON con las llaves exactas: 'consumo' y 'tarifa'."
+                        )
+                        response = client_gemini.models.generate_content(
+                            model='gemini-2.5-flash',
+                            contents=[
+                                types.Part.from_bytes(data=file_bytes, mime_type="image/jpeg"),
+                                prompt_ia
+                            ],
+                            config=types.GenerateContentConfig(
+                                response_mime_type="application/json",
+                            ),
+                        )
                     
+                    # Decodificar el JSON de respuesta de la IA
                     datos = json.loads(response.text)
                     consumo_kwh = float(datos.get("consumo", 246.69))
                     tarifa_kwh = float(datos.get("tarifa", 920.32))
-                    st.success(f"✅ Documento analizado con éxito por Gemini: {consumo_kwh:,.2f} kWh/mes a ${tarifa_kwh:,.2f}/kWh")
+                    st.success(f"✅ Documento analizado con éxito por la IA: {consumo_kwh:,.2f} kWh/mes a ${tarifa_kwh:,.2f}/kWh")
                     
                 except Exception as e:
                     st.error(f"Error en la lectura del documento: {e}. Se cargaron los datos de respaldo automáticos.")
@@ -169,41 +188,3 @@ with tab2:
         "Año": años,
         "Ahorro del Periodo ($)": ahorros_anuales,
         "Flujo Acumulado ($)": flujo_caja_acumulado
-    })
-    st.dataframe(df_financiero.style.format({"Ahorro del Periodo ($)": "$ {:,.0f}", "Flujo Acumulado ($)": "$ {:,.0f}"}), use_container_width=True)
-    st.line_chart(df_financiero.set_index("Año")["Flujo Acumulado ($)"])
-
-# --- MÓDULO 5: MOTOR DE EXPORTACIÓN E INFORME FINAL ---
-st.header("5. Entregables y Cierre de Venta")
-
-class CotizadorSolarPDF(FPDF):
-    def header(self):
-        self.set_fill_color(243, 156, 18) 
-        self.rect(0, 0, 210, 15, 'F')
-        self.set_font('Helvetica', 'B', 10)
-        self.set_text_color(255, 255, 255)
-        self.cell(0, -2, "RANGE OF SOLUTIONS S.A.S. - INFORME ENERGÉTICO", align='C')
-        self.ln(12)
-
-    def footer(self):
-        self.set_y(-15)
-        self.set_font('Helvetica', 'I', 8)
-        self.set_text_color(127, 138, 143)
-        self.cell(0, 10, f"Página {self.page_no()} | Propuesta generada automáticamente por Range Solutions", align='C')
-
-def generar_propuesta_pdf():
-    pdf = CotizadorSolarPDF()
-    pdf.add_page()
-    pdf.set_margins(15, 20, 15)
-    
-    pdf.set_y(25)
-    pdf.set_font('Helvetica', 'B', 16)
-    pdf.set_text_color(44, 62, 80)
-    pdf.cell(0, 10, "ESTUDIO DE FACTIBILIDAD Y OFERTA SOLAR FV", ln=True)
-    
-    pdf.set_draw_color(243, 156, 18)
-    pdf.set_line_width(0.8)
-    pdf.line(15, 35, 195, 35)
-    pdf.ln(5)
-    
-    pdf.set_font('Helvetica', 'B', 12)
