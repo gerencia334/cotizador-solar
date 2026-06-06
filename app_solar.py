@@ -47,10 +47,11 @@ st.markdown("<h1 style='text-align: center; color: #f39c12; font-size: 24px; mar
 st.markdown("<p style='text-align: center; color: #7f8c8d; font-size: 14px;'>Ingeniería Avanzada Multi-Nivel y Analítica Financiera de Retorno</p>", unsafe_allow_html=True)
 
 
-# --- MÓDULO 1: CAPTURA DE DATOS ---
+# --- MÓDULO 1: CAPTURA DE DATOS CON BLINDAJE MULTI-IA ---
 st.header("1. Entrada de Datos de Consumo")
 metodo = st.selectbox("Método de captura de datos:", ["📸 Analizar Recibo (PDF o Imagen) con IA", "⌨️ Registro Manual"])
 
+# Variables de respaldo base (Santa Marta)
 consumo_kwh = 246.69
 tarifa_kwh = 920.32
 lectura_exitosa = False
@@ -74,7 +75,7 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                 except Exception as e:
                     st.error(f"Error al leer el archivo PDF: {e}")
 
-            # --- ESTRATEGIA 1: OPENAI ---
+            # --- ESTRATEGIA 1: PROCESAR CON OPENAI ---
             if client_openai and not lectura_exitosa and texto_recibo.strip():
                 try:
                     prompt_sistema = (
@@ -98,7 +99,7 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                 except Exception:
                     pass
 
-            # --- ESTRATEGIA 2: GEMINI ---
+            # --- ESTRATEGIA 2: FALLBACK CON GEMINI ---
             if client_gemini and not lectura_exitosa:
                 for modelo in ['gemini-1.5-flash', 'gemini-2.5-flash']:
                     try:
@@ -125,7 +126,6 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                             res_plano = client_gemini.models.generate_content(model=modelo, contents=prompt_plano)
                             numeros = re.findall(r'\d+[\.,]\d+|\d+', res_plano.text)
                             if len(numeros) >= 2:
-                                # CORRECCIÓN FINAL: Indexación explícita sobre los elementos de la lista
                                 consumo_kwh = float(numeros[0].replace(',', '.'))
                                 tarifa_kwh = float(numeros[1].replace(',', '.'))
                                 lectura_exitosa = True
@@ -134,7 +134,7 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                         except Exception:
                             continue
 
-            # --- ESTRATEGIA 3: REGEX LOCAL ---
+            # --- ESTRATEGIA 3: EXPRESIONES REGULARES ---
             if not lectura_exitosa and texto_recibo.strip():
                 try:
                     match_consumo = re.search(r'(?:consumo|activo|mes|facturado)[\s\D]*(\d+[\.,]\d+|\d+)\s*(?:kwh)', texto_recibo, re.IGNORECASE)
@@ -184,7 +184,7 @@ else:
     factor_estructura, factor_electricos, factor_instalacion = 1.35, 1.50, 1.45
     detalle_infraestructura = "3+ Pisos - Anclaje Reforzado y Altura Crítica"
 
-with st.expander("🛠️ Desglose del APU de Materiales y Mano de Obra (Modificable)"):
+with st.expander("🛠️ Desglose del APU de Materiales y Mano de Obra (Modificable)", expanded=False):
     base_generacion = st.number_input("Equipos Base (Paneles Tier 1 + Inversores)", value=15403044.8, step=50000.0)
     base_estructura = st.number_input("Estructura Base de Aluminio Al6005-T5", value=1460845.0, step=10000.0)
     base_electricos = st.number_input("Protecciones AC/DC y Cableado Solar Base", value=7443247.0, step=20000.0)
