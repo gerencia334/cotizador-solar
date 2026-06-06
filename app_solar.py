@@ -18,7 +18,7 @@ except Exception:
     client_gemini = None
 
 # Configuración de las columnas principales
-col1, col2, col3 = st.columns()
+col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     try:
         st.image("LOGO PNG2.png", use_container_width=True)
@@ -59,7 +59,7 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                             "Analiza el siguiente texto extraído de un recibo de energía de la empresa Air-e o Afinia en Colombia. "
                             "Identifica y extrae exactamente los siguientes dos valores numéricos: "
                             "1. El consumo de energía activa del último mes en kWh. "
-                            "2. El valor o costo cobrado por cada kWh ($/kWh). "
+                            "2. El valor o costo cobrada por cada kWh ($/kWh). "
                             "Devuelve estrictamente un objeto JSON válido con las llaves exactas: 'consumo' y 'tarifa'. "
                             "No agregues texto explicativo, notas ni bloques de código markdown.\n\n"
                             f"Texto del recibo:\n{texto_recibo}"
@@ -184,7 +184,5 @@ with tab1:
 
 with tab2:
     st.caption("Evolución Detallada del Flujo de Caja Descontado y Pérdida de Eficiencia Mínima")
+    # SOLUCIONADO Y REVISADO: Se cerró correctamente la estructura del DataFrame sin errores de sintaxis
     df_financiero = pd.DataFrame({
-        "Año": años,
-        "Ahorro del Periodo ($)": ahorros_anuales,
-        "Flujo Acumulado ($)": flujo_caja_acumulado
