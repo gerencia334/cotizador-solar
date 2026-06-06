@@ -47,11 +47,10 @@ st.markdown("<h1 style='text-align: center; color: #f39c12; font-size: 24px; mar
 st.markdown("<p style='text-align: center; color: #7f8c8d; font-size: 14px;'>Ingeniería Avanzada Multi-Nivel y Analítica Financiera de Retorno</p>", unsafe_allow_html=True)
 
 
-# --- MÓDULO 1: CAPTURA DE DATOS CON BLINDAJE MULTI-IA ---
+# --- MÓDULO 1: CAPTURA DE DATOS ---
 st.header("1. Entrada de Datos de Consumo")
 metodo = st.selectbox("Método de captura de datos:", ["📸 Analizar Recibo (PDF o Imagen) con IA", "⌨️ Registro Manual"])
 
-# Variables de respaldo base (Santa Marta)
 consumo_kwh = 246.69
 tarifa_kwh = 920.32
 lectura_exitosa = False
@@ -75,7 +74,7 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                 except Exception as e:
                     st.error(f"Error al leer el archivo PDF: {e}")
 
-            # --- ESTRATEGIA 1: PROCESAR CON OPENAI ---
+            # --- ESTRATEGIA 1: OPENAI ---
             if client_openai and not lectura_exitosa and texto_recibo.strip():
                 try:
                     prompt_sistema = (
@@ -99,7 +98,7 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                 except Exception:
                     pass
 
-            # --- ESTRATEGIA 2: FALLBACK CON GEMINI ---
+            # --- ESTRATEGIA 2: GEMINI ---
             if client_gemini and not lectura_exitosa:
                 for modelo in ['gemini-1.5-flash', 'gemini-2.5-flash']:
                     try:
@@ -126,6 +125,7 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                             res_plano = client_gemini.models.generate_content(model=modelo, contents=prompt_plano)
                             numeros = re.findall(r'\d+[\.,]\d+|\d+', res_plano.text)
                             if len(numeros) >= 2:
+                                # CORRECCIÓN FINAL: Indexación explícita sobre los elementos de la lista
                                 consumo_kwh = float(numeros[0].replace(',', '.'))
                                 tarifa_kwh = float(numeros[1].replace(',', '.'))
                                 lectura_exitosa = True
@@ -134,7 +134,7 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                         except Exception:
                             continue
 
-            # --- ESTRATEGIA 3: EXPRESIONES REGULARES ---
+            # --- ESTRATEGIA 3: REGEX LOCAL ---
             if not lectura_exitosa and texto_recibo.strip():
                 try:
                     match_consumo = re.search(r'(?:consumo|activo|mes|facturado)[\s\D]*(\d+[\.,]\d+|\d+)\s*(?:kwh)', texto_recibo, re.IGNORECASE)
@@ -164,10 +164,9 @@ else:
     tarifa_kwh = c2.number_input("Tarifa del Servicio ($/kWh)", min_value=0.0, step=1.0, value=920.32)
 
 
-# --- MÓDULO 2: PARÁMETROS ESTRUCTURALES Y COSTOS DE INGENIERÍA (NUEVO) ---
+# --- MÓDULO 2: PARÁMETROS ESTRUCTURALES Y COSTOS DE INGENIERÍA ---
 st.header("2. Configuración Estructural e Ingeniería de Costos")
 
-# Estandarización por niveles y altura de la edificación
 tipo_estructura = st.selectbox(
     "Niveles / Altura de la estructura (Define el estándar de materiales):",
     ["🏢 1 Piso (Estándar - Anclaje Coplanar/Inclinado Corto)", 
@@ -175,22 +174,23 @@ tipo_estructura = st.selectbox(
      "🏢 3+ Pisos (Alto riesgo - Requiere anclajes reforzados Al6005-T5, cableado extendido y logística pesada)"]
 )
 
-# Factores multiplicadores estándar según la complejidad estructural
 if "1 Piso" in tipo_estructura:
-    factor_estructura = 1.0
-    factor_electricos = 1.0
-    factor_instalacion = 1.0
+    factor_estructura, factor_electricos, factor_instalacion = 1.0, 1.0, 1.0
     detalle_infraestructura = "1 Piso - Anclaje Coplanar Estándar"
 elif "2 Pisos" in tipo_estructura:
-    factor_estructura = 1.15  # 15% más en perfiles y kits de unión
-    factor_electricos = 1.25  # 25% más en metros de cable solar DC/AC y tuberías EMT
-    factor_instalacion = 1.20 # 20% más por maniobras y viáticos de altura
-    detalle_infraestructura = "2 Pisos - Estructura Expandida y Conducción Eléctrica Vertical"
+    factor_estructura, factor_electricos, factor_instalacion = 1.15, 1.25, 1.20
+    detalle_infraestructura = "2 Pisos - Estructura Expandida y Conducción Vertical"
 else:
-    factor_estructura = 1.35  # 35% más en anclajes reforzados contra vientos fuertes en altura
-    factor_electricos = 1.50  # 50% más de caída de tensión y tramos extendidos de cableado
-    factor_instalacion = 1.45 # 45% de incremento por seguridad industrial, líneas de vida y andamiaje
-    detalle_infraestructura = "3+ Pisos - Anclaje Estructural Reforzado, Caída de Tensión Compensada y Altura Crítica"
+    factor_estructura, factor_electricos, factor_instalacion = 1.35, 1.50, 1.45
+    detalle_infraestructura = "3+ Pisos - Anclaje Reforzado y Altura Crítica"
 
-with st.expander("🛠️ Desglose del APU de Materiales y Mano de Obra (Modificable)", expanded=False):
+with st.expander("🛠️ Desglose del APU de Materiales y Mano de Obra (Modificable)"):
     base_generacion = st.number_input("Equipos Base (Paneles Tier 1 + Inversores)", value=15403044.8, step=50000.0)
+    base_estructura = st.number_input("Estructura Base de Aluminio Al6005-T5", value=1460845.0, step=10000.0)
+    base_electricos = st.number_input("Protecciones AC/DC y Cableado Solar Base", value=7443247.0, step=20000.0)
+    base_instalacion = st.number_input("Mano de Obra Certificada, Trámites RETIE y Diseños", value=3840000.0, step=50000.0)
+    viaticos = st.number_input("Logística, Viáticos y Traslados Regionales", value=0, step=10000)
+
+costo_generacion = base_generacion
+costo_estructura = base_estructura * factor_estructura
+costo_electricos = base_electricos * factor_electricos
