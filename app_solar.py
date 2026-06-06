@@ -102,7 +102,7 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
 
             # --- ESTRATEGIA 2: FALLBACK CON GEMINI ---
             if client_gemini and not lectura_exitosa:
-                for modelo in ['gemini-1.5-flash', 'gemini-2.5-flash']:
+                for modelo in ['gemini-2.5-flash', 'gemini-1.5-flash']:
                     try:
                         if is_pdf and texto_recibo.strip():
                             prompt_ia = (
@@ -185,7 +185,7 @@ costo_base_total = costo_generacion + costo_estructura + costo_electricos + cost
 
 # --- MÓDULO 3: MARGENES COMERCIALES ---
 st.header("3. Estructuración Comercial")
-margen = st.slider("Margen de Utilidad Deseado para Range S.A.S. (%)", 5, 50, 25)
+margen = st.slider("Margen de Utilidad Deseado para Range S.A.S. (%)", 5, 50, 21)
 
 precio_venta_neto = costo_base_total / (1 - (margen / 100))
 utilidad_bruta = precio_venta_neto - costo_base_total
