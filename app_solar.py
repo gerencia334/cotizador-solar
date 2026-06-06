@@ -58,9 +58,9 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                         "No agregues texto explicativo, notas ni bloques de código markdown."
                     )
                     
-                    # ENFOQUE COMPATIBLE: Forzamos el uso del modelo 'gemini-1.5-flash' para saltar el bloqueo 403
+                    # SOLUCIONADO: Usamos 'gemini-2.5-flash', el nombre de modelo correcto y nativo para la librería google-genai
                     response = client_gemini.models.generate_content(
-                        model='gemini-1.5-flash',
+                        model='gemini-2.5-flash',
                         contents=[
                             types.Part.from_bytes(
                                 data=file_bytes,
