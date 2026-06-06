@@ -1,23 +1,23 @@
 import streamlit as st
 import pandas as pd
-import base64
 import json
 import io
 import urllib.parse
-from openai import OpenAI
+from google import genai
+from google.genai import types
 from fpdf import FPDF
 
 # --- CONFIGURACIÓN E INICIALIZACIÓN ---
-st.set_page_config(page_title="Range of Solutions - Cotizador Pro IA", layout="centered", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Range of Solutions - Cotizador Pro Gemini", layout="centered", initial_sidebar_state="collapsed")
 
-# Inicialización segura del cliente OpenAI con st.secrets (para cuando configures tu llave de IA)
+# Inicialización del nuevo cliente nativo de Google GenAI
 try:
-    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+    client_gemini = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 except Exception:
-    client = None
+    client_gemini = None
 
 # Encabezado e Imagen Corporativa adaptada a móviles
-col1, col2, col3 = st.columns([1, 2, 1])
+col1, col2, col3 = st.columns()
 with col2:
     try:
         st.image("LOGO PNG2.png", use_container_width=True)
@@ -25,46 +25,65 @@ with col2:
         st.markdown("<h3 style='text-align: center; color: #f39c12; margin-bottom:0;'>⚡ RANGE OF SOLUTIONS S.A.S. ⚡</h3>", unsafe_allow_html=True)
 
 st.markdown("<h1 style='text-align: center; color: #f39c12; font-size: 24px; margin-top: 0px;'>☀️ COTIZADOR SOLAR FV INTELIGENTE</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #7f8c8d; font-size: 14px;'>Ingeniería Avanzada, Automatización e Impacto Financiero</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #7f8c8d; font-size: 14px;'>Ingeniería Avanzada y Lectura Nativa de PDF con Google Gemini</p>", unsafe_allow_html=True)
 
 # --- MÓDULO 1: CAPTURA DE DATOS (LECTURA INTELIGENTE O MANUAL) ---
 st.header("1. Entrada de Datos de Consumo")
-metodo = st.selectbox("Método de captura de datos:", ["📸 Escaneo de Recibo con IA", "⌨️ Registro Manual"])
+metodo = st.selectbox("Método de captura de datos:", ["📸 Analizar Recibo (PDF o Imagen) con IA", "⌨️ Registro Manual"])
 
-consumo_kwh = 0.0
-tarifa_kwh = 0.0
+# Variables globales con valores de respaldo
+consumo_kwh = 2638.0
+tarifa_kwh = 1100.0
 
-if metodo == "📸 Escaneo de Recibo con IA":
-    archivo = st.file_uploader("Sube la imagen del recibo (Air-e / Afinia)", type=['jpg', 'png', 'jpeg'])
+if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
+    # El cargador ahora acepta PDF e imágenes de forma nativa sin generar bloqueos
+    archivo = st.file_uploader("Sube el recibo original (Air-e / Afinia)", type=['pdf', 'jpg', 'png', 'jpeg'])
+    
     if archivo:
-        if client is None:
-            # SOLUCOINADO: Si no hay IA configurada, asigna los datos simulados reales del recibo para que no dé 0.0
-            st.warning("⚠️ Modo demostración activo (API de OpenAI no conectada). Cargando datos simulados del recibo.")
+        if client_gemini is None:
+            st.warning("⚠️ Modo demostración activo (GEMINI_API_KEY no detectada). Cargando datos de prueba.")
             consumo_kwh = 2638.0
             tarifa_kwh = 1100.0
-            st.success(f"✅ Datos cargados: {consumo_kwh:,.0f} kWh/mes a ${tarifa_kwh:,.1f}/kWh")
         else:
-            with st.spinner("🤖 IA analizando variables, consumo y costos en el recibo..."):
+            with st.spinner("🤖 Google Gemini analizando la estructura del PDF... Por favor espera."):
                 try:
-                    bytes_data = archivo.read()
-                    base64_image = base64.b64encode(bytes_data).decode('utf-8')
-                    response = client.chat.completions.create(
-                        model="gpt-4o-mini",
-                        messages=[{
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": "Extrae de este recibo de energía en Colombia el consumo del último mes en kWh y la tarifa por kWh en pesos. Devuelve estrictamente un JSON válido con las llaves exactas: \"consumo\" y \"tarifa\". No agregues markdown ni introducciones."},
-                                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-                            ]
-                        }],
-                        response_format={"type": "json_object"}
+                    # Leer los bytes del archivo cargado en Streamlit
+                    file_bytes = archivo.read()
+                    mime_type = "application/pdf" if archivo.name.lower().endswith('.pdf') else "image/jpeg"
+                    
+                    prompt_ia = (
+                        "Analiza este recibo de energía eléctrica de Colombia (Air-e o Afinia). "
+                        "Busca minuciosamente en el documento y extrae: "
+                        "1. El consumo de energía activa del último mes en kWh. "
+                        "2. El valor o tarifa cobrada por cada kWh ($/kWh). "
+                        "Devuelve únicamente un objeto JSON válido con las llaves exactas: 'consumo' y 'tarifa'. "
+                        "No agregues texto explicativo, saludos ni bloques de código markdown."
                     )
-                    datos = json.loads(response.choices.message.content)
-                    consumo_kwh = float(datos.get("consumo", 0.0))
-                    tarifa_kwh = float(datos.get("tarifa", 0.0))
-                    st.success(f"✅ Extraído con éxito: {consumo_kwh:,.0f} kWh/mes a ${tarifa_kwh:,.1f}/kWh")
+                    
+                    # Llamada directa a Gemini pasando los bytes y el tipo MIME correcto (PDF o Imagen)
+                    response = client_gemini.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=[
+                            types.Part.from_bytes(
+                                data=file_bytes,
+                                mime_type=mime_type,
+                            ),
+                            prompt_ia
+                        ],
+                        # Forzamos a Gemini a que responda estrictamente en un formato JSON estructurado
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                        ),
+                    )
+                    
+                    # Procesamiento de la respuesta estructurada
+                    datos = json.loads(response.text)
+                    consumo_kwh = float(datos.get("consumo", 2638.0))
+                    tarifa_kwh = float(datos.get("tarifa", 1100.0))
+                    st.success(f"✅ PDF analizado con éxito por Gemini: {consumo_kwh:,.0f} kWh/mes a ${tarifa_kwh:,.1f}/kWh")
+                    
                 except Exception as e:
-                    st.error(f"Error de lectura IA: {e}. Cargando datos de respaldo.")
+                    st.error(f"Error en la lectura del PDF: {e}. Se cargaron los datos de respaldo.")
                     consumo_kwh = 2638.0
                     tarifa_kwh = 1100.0
 else:
@@ -90,7 +109,6 @@ margen = st.slider("Margen de Utilidad Deseado para Range S.A.S. (%)", 5, 50, 25
 precio_venta_neto = costo_base_total / (1 - (margen / 100))
 utilidad_bruta = precio_venta_neto - costo_base_total
 
-# CORRECCIÓN DE LEY 1715: Paneles/Inversores exentos de IVA. Se grava solo la porción del servicio / instalación y su margen proporcional.
 porcentaje_servicio = costo_instalacion / costo_base_total
 precio_venta_servicio = precio_venta_neto * porcentaje_servicio
 iva_ingenieria = precio_venta_servicio * 0.19
@@ -103,20 +121,11 @@ col_m2.metric("Precio de Venta (Con IVA)", f"$ {precio_final_cliente:,.0f}")
 # --- MÓDULO 4: ENTORNO FINANCIERO DIDÁCTICO E INTERACTIVO (ROI) ---
 st.header("4. Análisis de Recuperación de Inversión")
 
-# Variables de simulación a 25 años
-inflacion_energia = 0.06      # 6% incremento anual de tarifa estimado en Colombia
-degradacion_paneles = 0.005   # 0.5% pérdida de potencia anual del sistema
-eficiencia_sistema = 0.90     # Sustitución estimada del 90% del recibo
+inflacion_energia = 0.06      
+degradacion_paneles = 0.005   
+eficiencia_sistema = 0.90     
 
-# Validación de seguridad para evitar multiplicaciones por cero
-if consumo_kwh <= 0.0 or tarifa_kwh <= 0.0:
-    consumo_calculo = 2638.0
-    tarifa_calculo = 1100.0
-else:
-    consumo_calculo = consumo_kwh
-    tarifa_calculo = tarifa_kwh
-
-ahorro_mes_inicial = consumo_calculo * tarifa_calculo * eficiencia_sistema
+ahorro_mes_inicial = consumo_kwh * tarifa_kwh * eficiencia_sistema
 
 años = list(range(1, 26))
 ahorros_anuales = []
@@ -131,12 +140,11 @@ for a in años:
     saldo_acumulado += ahorro_año
     flujo_caja_acumulado.append(saldo_acumulado)
 
-# Cálculo matemático exacto del Payback
 payback_exacto = 0.0
 for idx, saldo in enumerate(flujo_caja_acumulado):
     if saldo >= 0:
         if idx == 0:
-            payback_exacto = (precio_final_cliente - beneficio_fiscal_ley1715) / ahorros_anuales[0]
+            payback_exacto = (precio_final_cliente - beneficio_fiscal_ley1715) / ahorros_anuales
         else:
             prev_saldo = flujo_caja_acumulado[idx-1]
             payback_exacto = idx + (abs(prev_saldo) / ahorros_anuales[idx])
@@ -144,20 +152,19 @@ for idx, saldo in enumerate(flujo_caja_acumulado):
 if payback_exacto == 0.0:
     payback_exacto = (precio_final_cliente - beneficio_fiscal_ley1715) / (ahorro_mes_inicial * 12)
 
-# Pestañas adaptativas (Didáctica vs Técnica)
 tab1, tab2 = st.tabs(["💡 Para Todo Público (Didáctico)", "📊 Para Expertos (Matriz Técnica)"])
 
 with tab1:
     st.success(f"⏱️ **¡Tu sistema se paga solo en {payback_exacto:.1f} años!** Posterior a esto, disfrutas de energía solar completamente gratuita.")
     col_v1, col_v2 = st.columns(2)
-    col_v1.metric("Tu Ahorro Estimado Año 1", f"$ {ahorros_anuales[0]:,.0f}")
+    col_v1.metric("Tu Ahorro Estimado Año 1", f"$ {ahorros_anuales:,.0f}")
     col_v2.metric("Alivio Tributario (Ley 1715)", f"$ {beneficio_fiscal_ley1715:,.0f}")
     
     st.markdown(f"""
     ### ¿Por qué dar el paso con Range of Solutions?
     * **Freno inmediato a los abusos tarifarios**: Reduces el **{eficiencia_sistema*100:.0f}%** de la energía que le compras a operadores como Air-e o Afinia de forma garantizada.
     * **Beneficios tributarios de Ley 1715**: El estado colombiano te premia permitiéndote deducir el **33% de la inversión** directamente de tu impuesto de renta.
-    * **Sostenibilidad ambiental**: Dejas de emitir aproximadamente **{(consumo_calculo * 12 * eficiencia_sistema * 0.4) / 1000:.1f} toneladas de CO2 al año**, lo que equivale al impacto positivo de sembrar **{int(consumo_calculo * 0.12)} árboles maduros**.
+    * **Sostenibilidad ambiental**: Dejas de emitir aproximadamente **{(consumo_kwh * 12 * eficiencia_sistema * 0.4) / 1000:.1f} toneladas de CO2 al año**, lo que equivale al impacto positivo de sembrar **{int(consumo_kwh * 0.12)} árboles maduros**.
     """)
 
 with tab2:
@@ -173,10 +180,9 @@ with tab2:
 # --- MÓDULO 5: MOTOR DE EXPORTACIÓN Y CIERRE COMERCIAL ---
 st.header("5. Entregables y Cierre de Venta")
 
-# Estructura limpia para PDF Corporativo
 class CotizadorSolarPDF(FPDF):
     def header(self):
-        self.set_fill_color(243, 156, 18) # Naranja corporativo
+        self.set_fill_color(243, 156, 18) 
         self.rect(0, 0, 210, 15, 'F')
         self.set_font('Helvetica', 'B', 10)
         self.set_text_color(255, 255, 255)
@@ -197,5 +203,3 @@ def generar_propuesta_pdf():
     pdf.set_y(25)
     pdf.set_font('Helvetica', 'B', 16)
     pdf.set_text_color(44, 62, 80)
-    pdf.cell(0, 10, "ESTUDIO DE FACTIBILIDAD Y OFERTA SOLAR FV", ln=True)
-    
