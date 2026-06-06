@@ -75,72 +75,69 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                     st.error(f"Error al leer el archivo PDF: {e}")
 
             # --- ESTRATEGIA 1: PROCESAR CON OPENAI ---
-            if client_openai and not lectura_exitosa:
+            if client_openai and not lectura_exitosa and texto_recibo.strip():
                 try:
-                    if is_pdf and texto_recibo.strip():
-                        prompt_sistema = (
-                            "Eres un experto analista de facturas de energía eléctrica de Colombia. "
-                            "Tu tarea es extraer el consumo del último mes en kWh y la tarifa por kWh en pesos ($/kWh). "
-                            "Responde únicamente un objeto JSON válido con las llaves exactas: 'consumo' y 'tarifa'. "
-                            "No incluyas texto aclaratorio ni marcas de bloques de código markdown."
-                        )
-                        response = client_openai.chat.completions.create(
-                            model="gpt-4o-mini",
-                            messages=[
-                                {"role": "system", "content": prompt_sistema},
-                                {"role": "user", "content": f"Texto extraído del recibo:\n{texto_recibo}"}
-                            ],
-                            response_format={"type": "json_object"}
-                        )
-                        datos = json.loads(response.choices.message.content)
-                        consumo_kwh = float(datos.get("consumo", 246.69))
-                        tarifa_kwh = float(datos.get("tarifa", 920.32))
-                        lectura_exitosa = True
-                        metodo_usado = "OpenAI (GPT-4o-mini)"
+                    prompt_sistema = (
+                        "Eres un experto analista de facturas de energía eléctrica de Colombia (Air-e, Afinia, etc.). "
+                        "Tu tarea es encontrar el consumo de energía activa del mes en kWh y el costo o tarifa por kWh ($/kWh). "
+                        "Analiza el texto libremente y entrega un objeto JSON válido con las llaves exactas: 'consumo' y 'tarifa'. "
+                        "Sé flexible con los formatos y encuentra los datos correctos."
+                    )
+                    response = client_openai.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[
+                            {"role": "system", "content": prompt_sistema},
+                            {"role": "user", "content": f"Texto extraído del recibo:\n{texto_recibo}"}
+                        ],
+                        response_format={"type": "json_object"}
+                    )
+                    datos = json.loads(response.choices.message.content)
+                    consumo_kwh = float(datos.get("consumo", 246.69))
+                    tarifa_kwh = float(datos.get("tarifa", 920.32))
+                    lectura_exitosa = True
+                    metodo_usado = "OpenAI (GPT-4o-mini)"
                 except Exception:
                     pass
 
             # --- ESTRATEGIA 2: FALLBACK CON GEMINI ---
             if client_gemini and not lectura_exitosa:
-                for modelo in ['gemini-2.5-flash', 'gemini-1.5-flash']:
+                # Usamos gpt o flash de forma inteligente y flexible
+                for modelo in ['gemini-1.5-flash', 'gemini-2.5-flash']:
                     try:
                         if is_pdf and texto_recibo.strip():
                             prompt_ia = (
-                                "Analiza el texto de un recibo de energía en Colombia. Extrae el consumo del último mes en kWh "
-                                "y la tarifa por kWh en pesos. Devuelve ESTRICTAMENTE un JSON con las llaves exactas 'consumo' y 'tarifa'. "
-                                f"Texto:\n{texto_recibo}"
+                                "Analiza este texto de una factura de energía en Colombia. "
+                                "Busca el consumo mensual en kWh y el valor de la tarifa por cada kWh. "
+                                "Devuelve un objeto JSON con las llaves 'consumo' y 'tarifa'. No agregues código markdown."
+                                f"\n\nTexto:\n{texto_recibo}"
                             )
                             response = client_gemini.models.generate_content(
                                 model=modelo,
                                 contents=prompt_ia,
                                 config=types.GenerateContentConfig(response_mime_type="application/json"),
                             )
-                        elif not is_pdf:
-                            archivo.seek(0)
-                            file_bytes = archivo.read()
-                            prompt_ia = (
-                                "Analiza la imagen de este recibo de energía de Colombia. Extrae el consumo del último mes en kWh "
-                                "y la tarifa por kWh en pesos. Devuelve un JSON con las llaves exactas: 'consumo' y 'tarifa'."
-                            )
-                            response = client_gemini.models.generate_content(
-                                model=modelo,
-                                contents=[
-                                    types.Part.from_bytes(data=file_bytes, mime_type="image/jpeg"),
-                                    prompt_ia
-                                ],
-                                config=types.GenerateContentConfig(response_mime_type="application/json"),
-                            )
-                        
-                        datos = json.loads(response.text)
-                        consumo_kwh = float(datos.get("consumo", 246.69))
-                        tarifa_kwh = float(datos.get("tarifa", 920.32))
-                        lectura_exitosa = True
-                        metodo_usado = f"Google Gemini ({modelo})"
-                        break
+                            datos = json.loads(response.text)
+                            consumo_kwh = float(datos.get("consumo", 246.69))
+                            tarifa_kwh = float(datos.get("tarifa", 920.32))
+                            lectura_exitosa = True
+                            metodo_usado = f"Google Gemini ({modelo})"
+                            break
                     except Exception:
-                        continue
+                        # SEGUNDO INTENTO: Si el JSON estricto falla, le pedimos texto plano e interpretamos con Regex
+                        try:
+                            prompt_plano = f"Extrae el consumo en kWh y la tarifa en pesos de este texto. Escribe solo los dos números separados por un guion (ejemplo: 350-850). No escribas nada más.\n\nTexto:\n{texto_recibo}"
+                            res_plano = client_gemini.models.generate_content(model=modelo, contents=prompt_plano)
+                            numeros = re.findall(r'\d+[\.,]\d+|\d+', res_plano.text)
+                            if len(numeros) >= 2:
+                                consumo_kwh = float(numeros[0].replace(',', '.'))
+                                tarifa_kwh = float(numeros[1].replace(',', '.'))
+                                lectura_exitosa = True
+                                metodo_usado = f"Google Gemini Heurístico ({modelo})"
+                                break
+                        except Exception:
+                            continue
 
-            # --- ESTRATEGIA 3: EXPRESIONES REGULARES ---
+            # --- ESTRATEGIA 3: EXPRESIONES REGULARES LOCALES ---
             if not lectura_exitosa and texto_recibo.strip():
                 try:
                     match_consumo = re.search(r'(?:consumo|activo|mes|facturado)[\s\D]*(\d+[\.,]\d+|\d+)\s*(?:kwh)', texto_recibo, re.IGNORECASE)
@@ -159,7 +156,7 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
             if lectura_exitosa:
                 st.success(f"✅ Documento analizado con éxito vía {metodo_usado}: {consumo_kwh:,.2f} kWh/mes a ${tarifa_kwh:,.2f}/kWh")
             else:
-                st.warning("⚠️ Los servicios de IA no pudieron extraer los datos. Se cargaron los valores base editables.")
+                st.warning("⚠️ Los servicios de IA no pudieron extraer los datos automáticamente. Se cargaron los valores editables de prueba.")
 
     with st.expander("✏️ Verificar y Ajustar Valores Extraídos", expanded=True):
         c1, c2 = st.columns(2)
@@ -195,5 +192,3 @@ precio_venta_servicio = precio_venta_neto * porcentaje_servicio
 iva_ingenieria = precio_venta_servicio * 0.19
 precio_final_cliente = precio_venta_neto + iva_ingenieria
 
-col_m1, col_m2 = st.columns(2)
-col_m1.metric("Margen Bruto Obtenido", f"$ {utilidad_bruta:,.0f}")
