@@ -6,7 +6,7 @@ import urllib.parse
 from google import genai
 from google.genai import types
 from fpdf import FPDF
-from pypdf import PdfReader  # Procesador nativo de texto para saltar el error 403
+from pypdf import PdfReader
 
 # --- CONFIGURACIÓN E INICIALIZACIÓN ---
 st.set_page_config(page_title="Range of Solutions - Cotizador Pro Gemini", layout="centered", initial_sidebar_state="collapsed")
@@ -18,7 +18,7 @@ except Exception:
     client_gemini = None
 
 # Configuración de las columnas principales
-col1, col2, col3 = st.columns([1, 2, 1])
+col1, col2, col3 = st.columns()
 with col2:
     try:
         st.image("LOGO PNG2.png", use_container_width=True)
@@ -47,8 +47,6 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
         else:
             with st.spinner("🤖 Analizando la estructura del documento de forma segura... Por favor espera."):
                 try:
-                    # ESTRATEGIA DE SEGURIDAD CONTRA EL ERROR 403:
-                    # Si es un PDF, extraemos el texto en el servidor para no enviarle el binario pesado a Google
                     if archivo.name.lower().endswith('.pdf'):
                         reader = PdfReader(archivo)
                         texto_recibo = ""
@@ -56,7 +54,7 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                             texto_recibo += page.extract_text() + "\n"
                         
                         prompt_ia = (
-                            "Analiza el siguiente texto extraído de un recibo de energía de la empresa Air-e o Afinia en Colombia. "
+                            "Analiza el siguiente texto extraído de un recibo de energía de la empresa Air-e o Afinia in Colombia. "
                             "Identifica y extrae exactamente los siguientes dos valores numéricos: "
                             "1. El consumo de energía activa del último mes en kWh. "
                             "2. El valor o costo cobrada por cada kWh ($/kWh). "
@@ -65,7 +63,6 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                             f"Texto del recibo:\n{texto_recibo}"
                         )
                         
-                        # Al enviarle solo texto plano, Gemini procesa en el plan libre sin error de permisos
                         response = client_gemini.models.generate_content(
                             model='gemini-2.5-flash',
                             contents=prompt_ia,
@@ -74,7 +71,6 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                             ),
                         )
                     else:
-                        # Si es una imagen (JPG/PNG), procesamos con el método multimedia tradicional
                         file_bytes = archivo.read()
                         prompt_ia = (
                             "Analiza la imagen de este recibo de energía de Colombia. Extrae el consumo del último mes en kWh "
@@ -91,7 +87,6 @@ if metodo == "📸 Analizar Recibo (PDF o Imagen) con IA":
                             ),
                         )
                     
-                    # Decodificar el JSON de respuesta de la IA
                     datos = json.loads(response.text)
                     consumo_kwh = float(datos.get("consumo", 246.69))
                     tarifa_kwh = float(datos.get("tarifa", 920.32))
@@ -159,7 +154,7 @@ payback_exacto = 0.0
 for idx, saldo in enumerate(flujo_caja_acumulado):
     if saldo >= 0:
         if idx == 0:
-            payback_exacto = (precio_final_cliente - beneficio_fiscal_ley1715) / ahorros_anuales[0]
+            payback_exacto = (precio_final_cliente - beneficio_fiscal_ley1715) / ahorros_anuales
         else:
             prev_saldo = flujo_caja_acumulado[idx-1]
             payback_exacto = idx + (abs(prev_saldo) / ahorros_anuales[idx])
@@ -172,7 +167,7 @@ tab1, tab2 = st.tabs(["💡 Para Todo Público (Didáctico)", "📊 Para Experto
 with tab1:
     st.success(f"⏱️ **¡Tu sistema se paga solo en {payback_exacto:.1f} años!** Posterior a esto, disfrutas de energía solar completamente gratuita.")
     col_v1, col_v2 = st.columns(2)
-    col_v1.metric("Tu Ahorro Estimado Año 1", f"$ {ahorros_anuales[0]:,.0f}")
+    col_v1.metric("Tu Ahorro Estimado Año 1", f"$ {ahorros_anuales:,.0f}")
     col_v2.metric("Alivio Tributario (Ley 1715)", f"$ {beneficio_fiscal_ley1715:,.0f}")
     
     st.markdown(f"""
@@ -184,5 +179,14 @@ with tab1:
 
 with tab2:
     st.caption("Evolución Detallada del Flujo de Caja Descontado y Pérdida de Eficiencia Mínima")
-    # SOLUCIONADO Y REVISADO: Se cerró correctamente la estructura del DataFrame sin errores de sintaxis
-    df_financiero = pd.DataFrame({
+    
+    # MODIFICACIÓN DE FUERZA BRUTA: Cambiamos la variable a listas independientes
+    # para que la caché de Streamlit Cloud se limpie obligatoriamente y no busque más la línea vieja
+    columnas_tabla = ["Año", "Ahorro del Periodo ($)", "Flujo Acumulado ($)"]
+    valores_tabla = [list(años), list(ahorros_anuales), list(flujo_caja_acumulado)]
+    
+    tabla_final_pro = pd.DataFrame(columns=columnas_tabla)
+    tabla_final_pro["Año"] = valores_tabla[0]
+    tabla_final_pro["Ahorro del Periodo ($)"] = valores_tabla[1]
+    tabla_final_pro["Flujo Acumulado ($)"] = valores_tabla[2]
+    
